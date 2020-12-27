@@ -1,5 +1,7 @@
 # Overview
 
+This is a fork of an existing project, which I have modified to work with the Dragino Lora module I bought...
+
 This is a python interface to the [Semtech SX1276/7/8/9](http://www.semtech.com/wireless-rf/rf-transceivers/) 
 long range, low power transceiver family.
 
@@ -39,23 +41,17 @@ Prototyping on a full-blown OS using high level programming languages has severa
 
 # Hardware
 
-The transceiver module is a SX1276 based Modtronix [inAir9B](http://modtronix.com/inair9.html). 
-It is mounted on a prototyping board to a Raspberry Pi rev 2 model B.
+The transceiver module is a SX1276 based HopeRf's RFM92W
+It is mounted on a Dragino raspberry pi hat
 
-| Proto board pin | RaspPi GPIO | Direction |
-|:----------------|:-----------:|:---------:|
-| inAir9B DIO0    | GPIO 22     |    IN     |
-| inAir9B DIO1    | GPIO 23     |    IN     |
-| inAir9B DIO2    | GPIO 24     |    IN     |
-| inAir9B DIO3    | GPIO 25     |    IN     |
-| inAir9b Reset   | GPIO ?      |    OUT    |
-| LED             | GPIO 18     |    OUT    |
-| Switch          | GPIO 4      |    IN     |
-
-Todo:
-- [ ] Add picture(s)
-- [ ] Wire the SX127x reset to a GPIO?
-
+| module pin name | RasPi 40-pin connector | RaspPi GPIO | Direction |
+|:---------------:|:----------------------:|:-----------:|:---------:|
+| MISO            | 21                     | SPI0        |    IN     |
+| MOSI            | 19                     | SPI0        |    OUT    |
+| SCK             | 23                     | SPI0        |    OUT    |
+| NSS             | 22                     | GPIO 25     |    OUT    |
+| DIO0            | 7                      | GPIO 4      |    IN     |
+| Reset           | 11                     | GPIO 17     |    OUT    |
 
 # Code Examples
 
@@ -116,20 +112,16 @@ lora.set_coding_rate(CODING_RATE.CR4_6)     # set it to CR4_6
 # Installation
 
 Make sure SPI is activated on you RaspberryPi: [SPI](https://www.raspberrypi.org/documentation/hardware/raspberrypi/spi/README.md)
+
+set the overlays to use the NSS signal as wired on Dragino. Add the following line to `/boot/config.txt`
+```
+dtoverlay=spi-1cs,cs0_pin=25
+```
+
 **pySX127x** requires these two python packages:
 * [RPi.GPIO](https://pypi.python.org/pypi/RPi.GPIO") for accessing the GPIOs, it should be already installed on
   a standard Raspian Linux image
 * [spidev](https://pypi.python.org/pypi/spidev) for controlling SPI
-
-In order to install spidev download the source code and run setup.py manually:
-```bash
-wget https://pypi.python.org/packages/source/s/spidev/spidev-3.1.tar.gz
-tar xfvz  spidev-3.1.tar.gz
-cd spidev-3.1
-sudo python setup.py install
-```
-
-At this point you may want to confirm that the unit tests pass. See the section [Tests](#tests) below.
 
 You can now run the scripts. For example dump the registers with `lora_util.py`: 
 ```bash

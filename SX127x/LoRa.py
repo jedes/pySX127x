@@ -84,15 +84,15 @@ class LoRa(object):
 
     def __init__(self, verbose=True, do_calibration=True, calibration_freq=868):
         """ Init the object
-        
+
         Send the device to sleep, read all registers, and do the calibration (if do_calibration=True)
         :param verbose: Set the verbosity True/False
         :param calibration_freq: call rx_chain_calibration with this parameter. Default is 868
         :param do_calibration: Call rx_chain_calibration, default is True.
         """
         self.verbose = verbose
-        # set the callbacks for DIO0..5 IRQs.
-        BOARD.add_events(self._dio0, self._dio1, self._dio2, self._dio3, self._dio4, self._dio5)
+        # set the callback for DIO0 IRQ.
+        BOARD.add_events(self._dio0)
         # set mode to sleep and read all registers
         self.set_mode(MODE.SLEEP)
         self.backup_registers = self.get_all_registers()
@@ -163,44 +163,6 @@ class LoRa(object):
         else:
             raise RuntimeError("unknown dio0mapping!")
 
-    def _dio1(self, channel):
-        # DIO1 00: RxTimeout
-        # DIO1 01: FhssChangeChannel
-        # DIO1 10: CadDetected
-        if self.dio_mapping[1] == 0:
-            self.on_rx_timeout()
-        elif self.dio_mapping[1] == 1:
-            self.on_fhss_change_channel()
-        elif self.dio_mapping[1] == 2:
-            self.on_CadDetected()
-        else:
-            raise RuntimeError("unknown dio1mapping!")
-
-    def _dio2(self, channel):
-        # DIO2 00: FhssChangeChannel
-        # DIO2 01: FhssChangeChannel
-        # DIO2 10: FhssChangeChannel
-        self.on_fhss_change_channel()
-
-    def _dio3(self, channel):
-        # DIO3 00: CadDone
-        # DIO3 01: ValidHeader
-        # DIO3 10: PayloadCrcError
-        if self.dio_mapping[3] == 0:
-            self.on_cad_done()
-        elif self.dio_mapping[3] == 1:
-            self.on_valid_header()
-        elif self.dio_mapping[3] == 2:
-            self.on_payload_crc_error()
-        else:
-            raise RuntimeError("unknown dio3 mapping!")
-
-    def _dio4(self, channel):
-        raise RuntimeError("DIO4 is not used")
-
-    def _dio5(self, channel):
-        raise RuntimeError("DIO5 is not used")
-
     # All the set/get/read/write functions
 
     def get_mode(self):
@@ -230,7 +192,7 @@ class LoRa(object):
         """
         payload_size = len(payload)
         self.set_payload_length(payload_size)
-        
+
         self.set_mode(MODE.STDBY)
         base_addr = self.get_fifo_tx_base_addr()
         self.set_fifo_addr_ptr(base_addr)
@@ -452,12 +414,12 @@ class LoRa(object):
         return self.spi.xfer([REG.LORA.IRQ_FLAGS | 0x80, v])[1]
 
     def clear_irq_flags(self,
-                        RxTimeout=None, RxDone=None, PayloadCrcError=None, 
-                        ValidHeader=None, TxDone=None, CadDone=None, 
+                        RxTimeout=None, RxDone=None, PayloadCrcError=None,
+                        ValidHeader=None, TxDone=None, CadDone=None,
                         FhssChangeChannel=None, CadDetected=None):
         v = 0
-        for i, s in enumerate(['CadDetected', 'FhssChangeChannel', 'CadDone', 
-                                'TxDone', 'ValidHeader', 'PayloadCrcError', 
+        for i, s in enumerate(['CadDetected', 'FhssChangeChannel', 'CadDone',
+                                'TxDone', 'ValidHeader', 'PayloadCrcError',
                                 'RxDone', 'RxTimeout']):
             this_bit = locals()[s]
             if this_bit is not None:
@@ -514,7 +476,7 @@ class LoRa(object):
                 coding_rate = val >> 1 & 0x07,
                 implicit_header_mode = val & 0x01
             )
-        
+
     def set_modem_config_1(self, bw=None, coding_rate=None, implicit_header_mode=None):
         loc = locals()
         current = self.get_modem_config_1()
@@ -538,7 +500,7 @@ class LoRa(object):
 
     def set_implicit_header_mode(self, implicit_header_mode):
         self.set_modem_config_1(implicit_header_mode=implicit_header_mode)
-        
+
     def get_modem_config_2(self, include_symb_timout_lsb=False):
         val = self.spi.xfer([REG.LORA.MODEM_CONFIG_2, 0])[1]
         d = dict(
@@ -549,7 +511,7 @@ class LoRa(object):
         if include_symb_timout_lsb:
             d['symb_timout_lsb'] = val & 0x03
         return d
-        
+
     def set_modem_config_2(self, spreading_factor=None, tx_cont_mode=None, rx_crc=None):
         loc = locals()
         # RegModemConfig2 contains the SymbTimout MSB bits. We tack the back on when writing this register.
@@ -585,7 +547,7 @@ class LoRa(object):
         :return: New value of register
         """
         return 0x27 | (invert & 0x01) << 6
-        
+
     @getter(REG.LORA.INVERT_IQ)
     def get_invert_iq(self, val):
         """ Get the invert the I and Q setting
@@ -629,7 +591,7 @@ class LoRa(object):
         lsb = preamble - msb * 256
         old_msb, old_lsb = self.spi.xfer([REG.LORA.PREAMBLE_MSB | 0x80, msb, lsb])[1:]
         return old_lsb + 256 * old_msb
-        
+
     @getter(REG.LORA.PAYLOAD_LENGTH)
     def get_payload_length(self, val):
         return val
@@ -938,7 +900,7 @@ class LoRa(object):
         s += " detect_optimize    %#02x\n" % self.get_detect_optimize()
         s += " detection_thresh   %#02x\n" % self.get_detection_threshold()
         s += " sync_word          %#02x\n" % self.get_sync_word()
-        s += " dio_mapping 0..5   %s\n" % self.get_dio_mapping()
+        s += " dio_mapping 0      %s\n" % self.get_dio_mapping()
         s += " tcxo               %s\n" % ['XTAL', 'TCXO'][self.get_tcxo()]
         s += " pa_dac             %s\n" % ['default', 'PA_BOOST'][self.get_pa_dac()]
         s += " fifo_addr_ptr      %#02x\n" % self.get_fifo_addr_ptr()
